@@ -3,6 +3,7 @@ package slogscope
 import (
 	"context"
 	"log/slog"
+	"time"
 )
 
 type handler struct {
@@ -16,6 +17,9 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) slog.Handler {
 			EnableFileWatcher: true,
 			Config:            nil,
 		}
+	}
+
+	if opts.EnableFileWatcher && opts.ConfigFile == nil {
 		filename := defaultConfigFile
 		opts.ConfigFile = &filename
 	}
@@ -56,6 +60,7 @@ func (h *handler) WithGroup(name string) slog.Handler {
 	return h.slogh.WithGroup(name)
 }
 
+// GetConfig returns the current configuration, which may be adjusted and then used with UseConfig(cfg Config).
 func (h *handler) GetConfig() Config {
 	return *h.opts.Config
 }
@@ -66,7 +71,51 @@ func (h *handler) UseConfig(cfg Config) {
 	h.mu.Lock()
 	h.opts.EnableFileWatcher = false
 	h.opts.Config = &cfg
-	h.opts.ConfigFile = nil
+	h.mu.Unlock()
+
+	h.initHandler(h.slogh, *h.opts)
+}
+
+// UseConfigTemporarily takes a new Config and immediately applies it to the current configuration.
+// In contrast to UseConfig(cfg	Config), this function automatically reverts to the state before calling the method,
+// after revert amount of time has elapsed.
+func (h *handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
+	h.mu.Lock()
+	oldCfg := h.GetConfig()
+	enableFileWatcher := h.opts.EnableFileWatcher
+
+	h.opts.EnableFileWatcher = false
+	h.opts.Config = &cfg
+	h.mu.Unlock()
+
+	h.initHandler(h.slogh, *h.opts)
+
+	go func(enableFileWatcher bool) {
+		<-time.After(revert)
+		if enableFileWatcher {
+			h.UseConfigFile()
+		} else {
+			h.UseConfig(oldCfg)
+		}
+	}(enableFileWatcher)
+}
+
+// UseConfigFile takes a filename as an argument that will be used for watching a config file for changes.
+// If no such filename is given, the handler uses the already existing ConfigFile from the HandlerOptions or,
+// if not present, falls back to the default config file (specified via defaultConfigFile).
+func (h *handler) UseConfigFile(cfgFile ...string) {
+	h.mu.Lock()
+	if len(cfgFile) == 1 && cfgFile[0] != "" {
+		h.opts.ConfigFile = &cfgFile[0]
+	}
+
+	// If we have zero or more than one config files and the current HandlerOptions
+	// doesn't contain a ConfigFile option, we use the default config filename.
+	if h.opts.ConfigFile == nil {
+		filename := defaultConfigFile
+		h.opts.ConfigFile = &filename
+	}
+	h.opts.EnableFileWatcher = true
 	h.mu.Unlock()
 
 	h.initHandler(h.slogh, *h.opts)

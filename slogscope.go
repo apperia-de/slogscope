@@ -60,7 +60,7 @@ type callInfo struct {
 // log response during program runtime without restarting.
 func (s *slogscope) initConfigFileWatcher() chan struct{} {
 	if !checkFileExists(*s.opts.ConfigFile) {
-		debugf("config file %q is missing! -> file watcher is disabled.", *s.opts.ConfigFile)
+		debugf("config file %q does not exists! -> file watcher is disabled.", *s.opts.ConfigFile)
 		return nil
 	}
 
@@ -81,13 +81,6 @@ func (s *slogscope) initConfigFileWatcher() chan struct{} {
 	// Start listening for events.
 	go func() {
 		debug("config file watcher started.")
-		initHandlerWithoutWatcher := func(msg string) {
-			debugf("config file (%s) was modified.", *s.opts.ConfigFile)
-			opts := *s.opts
-			opts.EnableFileWatcher = false
-			opts.ConfigFile = nil
-			s.initHandler(s.slogh, opts)
-		}
 
 		closeWatcher := func() {
 			if err := watcher.Close(); err != nil {
@@ -105,15 +98,21 @@ func (s *slogscope) initConfigFileWatcher() chan struct{} {
 				}
 				switch {
 				case event.Has(fsnotify.Remove):
-					initHandlerWithoutWatcher("config file (%s) has been removed.")
+					debugf("config file (%s) has been removed.", event.Name)
+					s.mu.Lock()
+					s.opts.EnableFileWatcher = false
+					s.mu.Unlock()
 					closeWatcher()
 					return
 				case event.Has(fsnotify.Rename):
-					initHandlerWithoutWatcher("config file (%s) has been renamed.")
+					debugf("config file (%s) has been renamed.", event.Name)
+					s.mu.Lock()
+					s.opts.EnableFileWatcher = false
+					s.mu.Unlock()
 					closeWatcher()
 					return
 				case event.Has(fsnotify.Write):
-					debug("config file (%s) was modified.", event.Name)
+					debugf("config file (%s) was modified.", event.Name)
 					s.initHandler(s.slogh, *s.opts)
 					closeWatcher()
 					return
@@ -144,18 +143,19 @@ func (s *slogscope) initHandler(slogh slog.Handler, opts HandlerOptions) {
 	s.slogh = slogh
 	s.opts = &opts
 
-	if opts.EnableFileWatcher && opts.ConfigFile == nil {
-		cfgFile := defaultConfigFile
-		s.opts.ConfigFile = &cfgFile
-	}
-
-	// Config file takes precedence over the config object.
-	if s.opts.ConfigFile != nil {
+	// We load the HandlerOptions.Config from a config file if no HandlerOptions.Config is provided.
+	if s.opts.Config == nil && s.opts.ConfigFile != nil {
 		s.opts.Config = s.loadConfig(*s.opts.ConfigFile)
 		debug("loaded config from file:", *s.opts.ConfigFile)
-	} else {
-		debug("using given config:", *s.opts.Config)
 	}
+
+	if s.opts.Config == nil {
+		s.opts.Config = &Config{
+			LogLevel: defaultLogLevel,
+		}
+	}
+
+	debug("use config:", *s.opts.Config)
 
 	s.pkgMap.Clear()
 	for _, v := range s.opts.Config.Packages {
@@ -178,21 +178,21 @@ func (s *slogscope) initHandler(slogh slog.Handler, opts HandlerOptions) {
 func (s *slogscope) loadConfig(cfgFile string) *Config {
 	var cfg Config
 
-	// The default configuration for logging in case of the load config from file fails.
-	defaultCfg := Config{
-		LogLevel: defaultLogLevel,
+	if !checkFileExists(cfgFile) {
+		debugf("config file %q does not exists! -> file watcher is disabled.", cfgFile)
+		return nil
 	}
 
 	data, err := os.ReadFile(cfgFile)
 	if err != nil {
 		debugf("error reading config file (%s): %s", slog.String("filename", cfgFile), err.Error())
-		return &defaultCfg
+		return nil
 	}
 
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		debugf("error unmarshalling config file (%s): %s", slog.String("filename", cfgFile), err.Error())
-		return &defaultCfg
+		return nil
 	}
 
 	return &cfg
