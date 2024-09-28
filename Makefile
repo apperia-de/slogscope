@@ -30,7 +30,7 @@ major:
 	@echo $(NEW_VERSION) > $(VERSION_FILE)
 	@echo "Updated version to: $(NEW_VERSION)"
 	@git add .
-	@git commit -m "Release new minor version: (v$(NEW_VERSION))"
+	@git commit -m "Release new major version: (v$(NEW_VERSION))"
 	@git tag v$(NEW_VERSION)
 	@echo In order to update tags run: git push origin v$(NEW_VERSION)
 
