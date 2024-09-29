@@ -2,84 +2,120 @@ package slogscope
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 )
 
-type handler struct {
+type Handler struct {
 	*slogscope
 }
 
 // NewHandler creates a new slog.Handler
-func NewHandler(h slog.Handler, opts *HandlerOptions) slog.Handler {
-	if opts == nil {
-		opts = &HandlerOptions{
-			EnableFileWatcher: true,
-			Config:            nil,
+func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
+	o := HandlerOptions{}
+	//	EnableFileWatcher: false,
+	//	ConfigFile:        nil,
+	//	Config:            nil,
+	//	Debug:             false,
+	//}
+
+	if opts != nil {
+		o = *opts
+	}
+
+	//if opts == nil {
+	//	defaultOpts = &HandlerOptions{
+	//		EnableFileWatcher: true,
+	//		ConfigFile:        nil,
+	//		Config:            nil,
+	//		Debug:             false,
+	//	}
+	//}
+
+	if o.ConfigFile == nil {
+		filename := defaultConfigFile
+		o.ConfigFile = &filename
+	}
+
+	logger := slog.New(NewNilHandler())
+	switch h.(type) {
+	case nil:
+		panic("slog.Handler must not be nil")
+	case *Handler:
+		panic("slog.Handler must not be of type *Handler")
+	default:
+		// If debug mode is enabled, we use the given log Handler also for internal log messages.
+		if o.Debug {
+			logger = slog.New(h)
 		}
 	}
 
-	if opts.EnableFileWatcher && opts.ConfigFile == nil {
-		filename := defaultConfigFile
-		opts.ConfigFile = &filename
+	ss := &slogscope{logger: logger, slogh: h, opts: &o}
+	defer ss.initHandler()
+
+	// We load the HandlerOptions.Config from a config file if no HandlerOptions.Config is provided.
+	if ss.opts.Config == nil && ss.opts.ConfigFile != nil {
+		ss.loadConfig()
 	}
 
-	// We need to create an instance of the logger for internal logging purposes
-	// to prevent nil pointer exception during setup.
-	// Will be replaced later with the handler from the given HandlerFunc hFn.
-	ssc := &slogscope{}
-	defer ssc.initHandler(h, *opts)
-	sccHndl := &handler{
-		slogscope: ssc,
+	ssHndl := &Handler{
+		slogscope: ss,
 	}
-	sccHndl.h = sccHndl
-	return sccHndl
+	ssHndl.h = ssHndl
+
+	return ssHndl
 }
 
-func (h *handler) Enabled(_ context.Context, lvl slog.Level) bool {
+func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
 	globalLevel := h.getLogLevel(h.opts.Config.LogLevel)
 	cInfo := getCallerInfo(5)
 	if v, ok := h.pkgMap.Load(cInfo.PackageName); ok {
 		p := v.(*pkg)
-		debugf("use package log level=%q for package=%q", p.logLevel, p.name)
-		return lvl >= p.logLevel.Level()
+		if lvl >= p.logLevel.Level() {
+			h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, p.name))
+			return true
+		}
+		return false //return lvl >= p.logLevel.Level()
 	}
-	debugf("use default log level=%q for package=%q", globalLevel, cInfo.PackageName)
+	h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLevel, cInfo.PackageName))
 	return lvl >= globalLevel
 }
 
-func (h *handler) Handle(ctx context.Context, rec slog.Record) error {
+func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
 	return h.slogh.Handle(ctx, rec)
 }
 
-func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return h.slogh.WithAttrs(attrs)
 }
 
-func (h *handler) WithGroup(name string) slog.Handler {
+func (h *Handler) WithGroup(name string) slog.Handler {
 	return h.slogh.WithGroup(name)
 }
 
 // GetConfig returns the current configuration, which may be adjusted and then used with UseConfig(cfg Config).
-func (h *handler) GetConfig() Config {
+func (h *Handler) GetConfig() Config {
 	return *h.opts.Config
 }
 
 // UseConfig takes a new Config and immediately applies it to the current configuration.
 // It also disables any active file watcher.
-func (h *handler) UseConfig(cfg Config) {
+func (h *Handler) UseConfig(cfg Config) {
 	h.mu.Lock()
 	h.opts.EnableFileWatcher = false
 	h.opts.Config = &cfg
 	h.mu.Unlock()
 
-	h.initHandler(h.slogh, *h.opts)
+	h.initHandler()
+
+	h.logger.Debug(fmt.Sprintf("using config: %#v", *h.opts.Config))
 }
 
 // UseConfigTemporarily takes a new Config and immediately applies it to the current configuration.
 // In contrast to UseConfig(cfg	Config), this function automatically reverts to the state before calling the method,
 // after revert amount of time has elapsed.
-func (h *handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
+func (h *Handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
 	h.mu.Lock()
 	oldCfg := h.GetConfig()
 	enableFileWatcher := h.opts.EnableFileWatcher
@@ -88,22 +124,23 @@ func (h *handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
 	h.opts.Config = &cfg
 	h.mu.Unlock()
 
-	h.initHandler(h.slogh, *h.opts)
+	h.initHandler()
 
-	go func(enableFileWatcher bool) {
+	go func() {
 		<-time.After(revert)
 		if enableFileWatcher {
 			h.UseConfigFile()
 		} else {
 			h.UseConfig(oldCfg)
 		}
-	}(enableFileWatcher)
+	}()
+	h.logger.Debug(fmt.Sprintf("using config: %#v", *h.opts.Config))
 }
 
 // UseConfigFile takes a filename as an argument that will be used for watching a config file for changes.
-// If no such filename is given, the handler uses the already existing ConfigFile from the HandlerOptions or,
+// If no such filename is given, the Handler uses the already existing ConfigFile from the HandlerOptions or,
 // if not present, falls back to the default config file (specified via defaultConfigFile).
-func (h *handler) UseConfigFile(cfgFile ...string) {
+func (h *Handler) UseConfigFile(cfgFile ...string) {
 	h.mu.Lock()
 	if len(cfgFile) == 1 && cfgFile[0] != "" {
 		h.opts.ConfigFile = &cfgFile[0]
@@ -118,7 +155,8 @@ func (h *handler) UseConfigFile(cfgFile ...string) {
 	h.opts.EnableFileWatcher = true
 	h.mu.Unlock()
 
-	h.initHandler(h.slogh, *h.opts)
+	h.loadConfig().initHandler()
+	h.logger.Debug(fmt.Sprintf("using config file (%s): %#v", *h.opts.ConfigFile, *h.opts.Config))
 }
 
 type nilHandler struct{}

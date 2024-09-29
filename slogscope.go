@@ -17,7 +17,6 @@ import (
 
 // Constants for debug mode and defaults values.
 const (
-	debugMode         = false
 	defaultLogLevel   = LogLevelInfo
 	defaultConfigFile = "slogscope.yml"
 )
@@ -30,14 +29,15 @@ const (
 	LogLevelError = "ERROR"
 )
 
-// slogscope contains all required handler configurations.
+// slogscope contains all required Handler configurations.
 type slogscope struct {
-	h      *handler
+	h      *Handler
 	slogh  slog.Handler
 	opts   *HandlerOptions
 	pkgMap sync.Map
 	mu     sync.Mutex
 	doneCh chan struct{}
+	logger *slog.Logger
 }
 
 // pkg contains information about the package name and corresponding log level.
@@ -58,36 +58,38 @@ type callInfo struct {
 
 // initConfigFileWatcher watches the specified config file for changes and reflects them instantly in their
 // log response during program runtime without restarting.
-func (s *slogscope) initConfigFileWatcher() chan struct{} {
-	if !checkFileExists(*s.opts.ConfigFile) {
-		debugf("config file %q does not exists! -> file watcher is disabled.", *s.opts.ConfigFile)
+func (ss *slogscope) initConfigFileWatcher() chan struct{} {
+	if !checkFileExists(*ss.opts.ConfigFile) {
+		ss.logger.Debug(fmt.Sprintf("config file %q does not exists! -> file watcher is disabled.", *ss.opts.ConfigFile))
 		return nil
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		debug(err)
+		ss.logger.Debug(err.Error())
 		return nil
 	}
 
 	// Add the config file to watch.
-	err = watcher.Add(*s.opts.ConfigFile)
+	err = watcher.Add(*ss.opts.ConfigFile)
 	if err != nil {
-		debug(err)
+		ss.logger.Debug(err.Error())
 		return nil
 	}
 
 	doneCh := make(chan struct{})
 	// Start listening for events.
 	go func() {
-		debug("config file watcher started.")
+		//ss.logger.Debug("config file watcher started.")
+		ss.logger.Debug(fmt.Sprintf("started file watcher for config file (%s).", *ss.opts.ConfigFile))
 
 		closeWatcher := func() {
 			if err := watcher.Close(); err != nil {
-				debug("config file watcher error: " + err.Error())
+				ss.logger.Debug(fmt.Sprintf("file watcher error for config file (%s): %s.", *ss.opts.ConfigFile, err.Error()))
 				return
 			}
-			debug("config file watcher stopped.")
+			//ss.logger.Debug("config file watcher stopped.")
+			ss.logger.Debug(fmt.Sprintf("stopped file watcher for config file (%s).", *ss.opts.ConfigFile))
 		}
 
 		for {
@@ -98,22 +100,16 @@ func (s *slogscope) initConfigFileWatcher() chan struct{} {
 				}
 				switch {
 				case event.Has(fsnotify.Remove):
-					debugf("config file (%s) has been removed.", event.Name)
-					s.mu.Lock()
-					s.opts.EnableFileWatcher = false
-					s.mu.Unlock()
+					ss.logger.Debug(fmt.Sprintf("config file (%s) was removed.", event.Name))
 					closeWatcher()
 					return
 				case event.Has(fsnotify.Rename):
-					debugf("config file (%s) has been renamed.", event.Name)
-					s.mu.Lock()
-					s.opts.EnableFileWatcher = false
-					s.mu.Unlock()
+					ss.logger.Debug(fmt.Sprintf("config file (%s) was renamed.", event.Name))
 					closeWatcher()
 					return
 				case event.Has(fsnotify.Write):
-					debugf("config file (%s) was modified.", event.Name)
-					s.initHandler(s.slogh, *s.opts)
+					ss.logger.Debug(fmt.Sprintf("config file (%s) was modified.", event.Name))
+					ss.loadConfig().initHandler()
 					closeWatcher()
 					return
 				}
@@ -121,7 +117,7 @@ func (s *slogscope) initConfigFileWatcher() chan struct{} {
 				if !ok {
 					return
 				}
-				debug("config file watcher error:", err)
+				ss.logger.Debug(fmt.Sprintf("file watcher error for config file (%s): %s.", *ss.opts.ConfigFile, err.Error()))
 			case <-doneCh:
 				closeWatcher()
 				return
@@ -133,69 +129,66 @@ func (s *slogscope) initConfigFileWatcher() chan struct{} {
 }
 
 // initHandler initializes the slogscope instance depending on the given HandlerOptions.
-// If opts.EnableFileWatcher == true, the handler will try to load the config from a config file,
+// If opts.EnableFileWatcher == true, the Handler will try to load the config from a config file,
 // specified by HandlerOptions.ConfigFile (fallback filename is defaultConfigFile), and if that fails,
 // it uses a default Config with "INFO" as global log level.
-func (s *slogscope) initHandler(slogh slog.Handler, opts HandlerOptions) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (ss *slogscope) initHandler() {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 
-	s.slogh = slogh
-	s.opts = &opts
-
-	// We load the HandlerOptions.Config from a config file if no HandlerOptions.Config is provided.
-	if s.opts.Config == nil && s.opts.ConfigFile != nil {
-		s.opts.Config = s.loadConfig(*s.opts.ConfigFile)
-		debug("loaded config from file:", *s.opts.ConfigFile)
-	}
-
-	if s.opts.Config == nil {
-		s.opts.Config = &Config{
+	if ss.opts.Config == nil {
+		ss.opts.Config = &Config{
 			LogLevel: defaultLogLevel,
 		}
 	}
 
-	debug("use config:", *s.opts.Config)
+	ss.logger.Debug("use config:", "config", *ss.opts.Config)
 
-	s.pkgMap.Clear()
-	for _, v := range s.opts.Config.Packages {
+	ss.pkgMap.Clear()
+	for _, v := range ss.opts.Config.Packages {
 		p := &pkg{
 			name:     v.Name,
-			logLevel: s.getLogLevel(v.LogLevel),
+			logLevel: ss.getLogLevel(v.LogLevel),
 		}
-		s.pkgMap.Store(p.name, p)
+		ss.pkgMap.Store(p.name, p)
 	}
 
-	if s.doneCh != nil {
-		close(s.doneCh)
-		s.doneCh = nil
+	if ss.doneCh != nil {
+		close(ss.doneCh)
+		ss.doneCh = nil
 	}
-	if opts.EnableFileWatcher {
-		s.doneCh = s.initConfigFileWatcher()
+
+	if ss.opts.EnableFileWatcher && ss.opts.ConfigFile != nil {
+		ss.doneCh = ss.initConfigFileWatcher()
 	}
 }
 
-func (s *slogscope) loadConfig(cfgFile string) *Config {
-	var cfg Config
+func (ss *slogscope) loadConfig() *slogscope {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 
-	if !checkFileExists(cfgFile) {
-		debugf("config file %q does not exists! -> file watcher is disabled.", cfgFile)
-		return nil
+	if !checkFileExists(*ss.opts.ConfigFile) {
+		ss.logger.Debug(fmt.Sprintf("config file (%s) does not exists! -> file watcher is disabled.", *ss.opts.ConfigFile))
+		ss.opts.Config = nil
+		return ss
 	}
 
-	data, err := os.ReadFile(cfgFile)
+	data, err := os.ReadFile(*ss.opts.ConfigFile)
 	if err != nil {
-		debugf("error reading config file (%s): %s", slog.String("filename", cfgFile), err.Error())
-		return nil
+		ss.logger.Debug(fmt.Sprintf("error reading config file (%s): %s", *ss.opts.ConfigFile, err.Error()))
+		ss.opts.Config = nil
+		return ss
 	}
-
+	var cfg Config
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		debugf("error unmarshalling config file (%s): %s", slog.String("filename", cfgFile), err.Error())
-		return nil
+		ss.logger.Debug(fmt.Sprintf("error unmarshalling config file (%s): %s", *ss.opts.ConfigFile, err.Error()))
+		ss.opts.Config = nil
+		return ss
 	}
-
-	return &cfg
+	ss.opts.Config = &cfg
+	ss.logger.Debug(fmt.Sprintf("config file (%s) loaded.", *ss.opts.ConfigFile))
+	return ss
 }
 
 // getLogLevel converts string log levels to slog.Level representation.
@@ -203,7 +196,7 @@ func (s *slogscope) loadConfig(cfgFile string) *Config {
 // Additionally, it accepts the aforementioned strings +/- an integer for representing additional log levels, not
 // defined by the log/slog package.
 // Example: DEBUG-2 or ERROR+4
-func (s *slogscope) getLogLevel(level string) slog.Level {
+func (ss *slogscope) getLogLevel(level string) slog.Level {
 	levelMap := map[string]slog.Level{
 		LogLevelDebug: slog.LevelDebug,
 		LogLevelInfo:  slog.LevelInfo,
@@ -215,13 +208,13 @@ func (s *slogscope) getLogLevel(level string) slog.Level {
 
 	slogLevel := levelMap[defaultLogLevel]
 	if len(matches) != 5 {
-		debugf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel)
+		ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
 		return slogLevel
 	}
 
 	slogLevel, ok := levelMap[matches[1]]
 	if !ok {
-		debugf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel)
+		ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
 		return slogLevel
 	}
 
@@ -273,24 +266,4 @@ func getCallerInfo(skip int) *callInfo {
 func checkFileExists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	return !errors.Is(err, os.ErrNotExist)
-}
-
-func debug(a ...any) {
-	if debugMode {
-		ci := getCallerInfo(2)
-		fmt.Println("-- DEBUG-MODE --")
-		fmt.Printf("   source: %s\n", ci.Source)
-		fmt.Println(append([]any{"  message:"}, a...)...)
-		fmt.Println("------")
-	}
-}
-
-func debugf(format string, a ...any) {
-	if debugMode {
-		ci := getCallerInfo(2)
-		fmt.Println("-- DEBUG-MODE --")
-		fmt.Printf("   source: %s\n", ci.Source)
-		fmt.Println(append([]any{"  message:"}, fmt.Sprintf(format, a...))...)
-		fmt.Println("------")
-	}
 }

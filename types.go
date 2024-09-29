@@ -9,6 +9,7 @@ type HandlerOptions struct {
 	EnableFileWatcher bool
 	ConfigFile        *string
 	Config            *Config
+	Debug             bool
 }
 
 type Package struct {
