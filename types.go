@@ -6,10 +6,10 @@ type Config struct {
 }
 
 type HandlerOptions struct {
-	EnableFileWatcher bool
-	ConfigFile        *string
-	Config            *Config
 	Debug             bool
+	Config            *Config
+	ConfigFile        *string
+	EnableFileWatcher bool
 }
 
 type Package struct {
