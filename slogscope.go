@@ -80,7 +80,6 @@ func (ss *slogscope) initConfigFileWatcher() chan struct{} {
 	doneCh := make(chan struct{})
 	// Start listening for events.
 	go func() {
-		//ss.logger.Debug("config file watcher started.")
 		ss.logger.Debug(fmt.Sprintf("started file watcher for config file (%s).", *ss.opts.ConfigFile))
 
 		closeWatcher := func() {
@@ -88,7 +87,6 @@ func (ss *slogscope) initConfigFileWatcher() chan struct{} {
 				ss.logger.Debug(fmt.Sprintf("file watcher error for config file (%s): %s.", *ss.opts.ConfigFile, err.Error()))
 				return
 			}
-			//ss.logger.Debug("config file watcher stopped.")
 			ss.logger.Debug(fmt.Sprintf("stopped file watcher for config file (%s).", *ss.opts.ConfigFile))
 		}
 

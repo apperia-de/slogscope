@@ -85,6 +85,21 @@ func TestNewHandler(t *testing.T) {
 		assert.Equal(t, "INFO", cfg.LogLevel)
 		assert.Equal(t, []slogscope.Package(nil), cfg.Packages)
 	})
+
+	t.Run("test with debug mode enabled", func(t *testing.T) {
+		var buf bytes.Buffer
+		_ = slogscope.NewHandler(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}), &slogscope.HandlerOptions{
+			EnableFileWatcher: false,
+			Debug:             true,
+		})
+		line, err := buf.ReadString('\n')
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Contains(t, line, "msg=\"debug mode enabled\"")
+	})
 }
 
 // testResults is a helper function for the slogtest.TestHandler function

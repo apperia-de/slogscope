@@ -14,24 +14,10 @@ type Handler struct {
 // NewHandler creates a new slog.Handler
 func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 	o := HandlerOptions{}
-	//	EnableFileWatcher: false,
-	//	ConfigFile:        nil,
-	//	Config:            nil,
-	//	Debug:             false,
-	//}
 
 	if opts != nil {
 		o = *opts
 	}
-
-	//if opts == nil {
-	//	defaultOpts = &HandlerOptions{
-	//		EnableFileWatcher: true,
-	//		ConfigFile:        nil,
-	//		Config:            nil,
-	//		Debug:             false,
-	//	}
-	//}
 
 	if o.ConfigFile == nil {
 		filename := defaultConfigFile
@@ -48,6 +34,7 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 		// If debug mode is enabled, we use the given log Handler also for internal log messages.
 		if o.Debug {
 			logger = slog.New(h)
+			logger.Debug("debug mode enabled")
 		}
 	}
 
@@ -76,7 +63,7 @@ func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
 			h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, p.name))
 			return true
 		}
-		return false //return lvl >= p.logLevel.Level()
+		return false
 	}
 	h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLevel, cInfo.PackageName))
 	return lvl >= globalLevel
@@ -108,7 +95,6 @@ func (h *Handler) UseConfig(cfg Config) {
 	h.mu.Unlock()
 
 	h.initHandler()
-
 	h.logger.Debug(fmt.Sprintf("using config: %#v", *h.opts.Config))
 }
 
@@ -133,6 +119,7 @@ func (h *Handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
 		} else {
 			h.UseConfig(oldCfg)
 		}
+		h.logger.Debug(fmt.Sprintf("reverted config to original: %#v", oldCfg))
 	}()
 	h.logger.Debug(fmt.Sprintf("using config: %#v", *h.opts.Config))
 }
