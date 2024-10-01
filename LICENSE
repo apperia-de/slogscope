@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+### Acknowledgments
+This project uses or was inspired by the following related projects:
+- [fsnotify](https://github.com/fsnotify/fsnotify): Cross-platform filesystem notifications for Go.
+- [testify](github.com/stretchr/testify): A toolkit with common assertions and mocks that plays nicely with the standard library.
+- [yaml](https://github.com/go-yaml/yaml): YAML support for the Go language.

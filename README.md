@@ -35,56 +35,56 @@ Import `slogscope` in your project and configure the log levels per package as n
 package main
 
 import (
-  "github.com/apperia-de/slogscope"
-  "log/slog"
-  "os"
+	"github.com/apperia-de/slogscope"
+	"log/slog"
+	"os"
 )
 
 func main() {
-  // Example setup for custom log levels per package.
-  Handler := slogscope.NewHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-    AddSource:   true,
-  }), nil)
-  logger := slog.New(Handler)
-  slog.SetDefault(logger)
+	// Example setup for custom log levels per package.
+	Handler := slogscope.NewHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+	}), nil)
+	logger := slog.New(Handler)
+	slog.SetDefault(logger)
 
-  slog.Info("Hello World!")
+	slog.Info("Hello World!")
 }
 ```
 
 ### Custom `slogscope.HandlerOptions`
 
-This example uses a given `slogscope.Config` directly instead of loading it from a config file. 
+This example uses a given `slogscope.Config` directly instead of loading it from a config file.
 
 ```go
 package main
 
 import (
-  "github.com/apperia-de/slogscope"
-  "log/slog"
-  "os"
+	"github.com/apperia-de/slogscope"
+	"log/slog"
+	"os"
 )
 
 func main() {
-  cfg := slogscope.Config{
-    LogLevel: "INFO",
-    Packages: []slogscope.Package{
-      {
-        Name:     "PACKAGE_NAME_YOU_WANT_TO_OVERRIDE_DEFAULT_LOG_LEVEL",
-        LogLevel: "DEBUG",
-      },
-    },
-  }
+	cfg := slogscope.Config{
+		LogLevel: "INFO",
+		Packages: []slogscope.Package{
+			{
+				Name:     "PACKAGE_NAME_YOU_WANT_TO_OVERRIDE_DEFAULT_LOG_LEVEL",
+				LogLevel: "DEBUG",
+			},
+		},
+	}
 
-  // Example setup for custom log levels per package, with custom slogscope.HandlerOptions.
-  // It uses the given config directly instead from a config file.
-  Handler := slogscope.NewHandler(slog.NewTextHandler(os.Stdout, nil), &slogscope.HandlerOptions{
-    EnableFileWatcher: false,
-    Config:            &cfg,
-    ConfigFile:        nil,
-  })
-  logger := slog.New(Handler)
-  logger.Info("Hello World!")
+	// Example setup for custom log levels per package, with custom slogscope.HandlerOptions.
+	// It uses the given config directly instead from a config file.
+	Handler := slogscope.NewHandler(slog.NewTextHandler(os.Stdout, nil), &slogscope.HandlerOptions{
+		EnableFileWatcher: false,
+		Config:            &cfg,
+		ConfigFile:        nil,
+	})
+	logger := slog.New(Handler)
+	logger.Info("Hello World!")
 }
 
 ```
@@ -102,6 +102,15 @@ behavior is to inherit the global log level if no package-specific level is set.
 ### Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests to help improve `slogscope`.
+
+### Related Projects
+
+- [awesome-slog](https://github.com/go-slog/awesome-slog): Collection of log/slog related projects.
+
+### Acknowledgments
+
+This project was inspired by a [blog post](https://www.dolthub.com/blog/2024-09-13-package-scoped-logging-in-go-log4j/)
+from [@zachmu](https://github.com/zachmu) and my own need for this feature.
 
 ### License
 
