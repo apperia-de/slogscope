@@ -133,12 +133,6 @@ func (h *Handler) UseConfigFile(cfgFile ...string) {
 		h.opts.ConfigFile = &cfgFile[0]
 	}
 
-	// If we have zero or more than one config files and the current HandlerOptions
-	// doesn't contain a ConfigFile option, we use the default config filename.
-	if h.opts.ConfigFile == nil {
-		filename := defaultConfigFile
-		h.opts.ConfigFile = &filename
-	}
 	h.opts.EnableFileWatcher = true
 	h.mu.Unlock()
 

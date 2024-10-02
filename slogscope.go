@@ -3,8 +3,6 @@ package slogscope
 import (
 	"errors"
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"path"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v3"
 )
 
 // Constants for debug mode and defaults values.

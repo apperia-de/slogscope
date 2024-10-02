@@ -3,12 +3,13 @@ package slogscope_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/apperia-de/slogscope"
-	"github.com/stretchr/testify/assert"
 	"log/slog"
 	"os"
 	"testing"
 	"testing/slogtest"
+
+	"github.com/apperia-de/slogscope"
+	"github.com/stretchr/testify/assert"
 )
 
 var testConfigFile = "test/data/slogscope.test_config.yml"
@@ -25,7 +26,7 @@ func TestNewHandler(t *testing.T) {
 	})
 
 	t.Run("test if the given HandlerOptions.Config takes precedence over HandlerOptions.ConfigFile.", func(t *testing.T) {
-		var buf bytes.Buffer
+		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
 			ConfigFile:        &testConfigFile,
@@ -43,7 +44,7 @@ func TestNewHandler(t *testing.T) {
 	})
 
 	t.Run("test slogscope.Handler with a wrapped slog.JSONHandler and given Config", func(t *testing.T) {
-		var buf bytes.Buffer
+		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
 			ConfigFile:        nil,
@@ -58,7 +59,7 @@ func TestNewHandler(t *testing.T) {
 	})
 
 	t.Run("test slogscope.Handler with a wrapped slog.JSONHandler with Config from config file (slogscope.test_config.yml)", func(t *testing.T) {
-		var buf bytes.Buffer
+		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
 			ConfigFile:        &testConfigFile,
@@ -69,7 +70,7 @@ func TestNewHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 		cfg := h.GetConfig()
-		assert.Equal(t, "INFO", cfg.LogLevel)
+		assert.Equal(t, slogscope.LogLevelDebug, cfg.LogLevel)
 	})
 
 	t.Run("test default config file is missing", func(t *testing.T) {

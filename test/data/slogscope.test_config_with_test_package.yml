@@ -1,0 +1,6 @@
+log_level: INFO
+packages:
+  - name: github.com/apperia-de/slogscope_test
+    log_level: ERROR
+  - name: ANOTHER_PACKAGE_NAME_YOU_WANT_TO_OVERRIDE_DEFAULT_LOG_LEVEL
+    log_level: INFO

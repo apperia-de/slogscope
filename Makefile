@@ -6,6 +6,8 @@ VERSION := $(shell cat $(VERSION_FILE))
 MAJOR := $(word 1,$(subst ., ,$(VERSION)))
 MINOR := $(word 2,$(subst ., ,$(VERSION)))
 PATCH := $(word 3,$(subst ., ,$(VERSION)))
+TOTAL_COVERAGE := $(shell go tool cover -func coverage.out | grep -Eo "total:.*(\d+%)" | grep -Eo "\d+\.\d%")
+COVERAGE_BADGE_URL := $(shell echo 'https://img.shields.io/badge/coverage-_PERCENTAGE_-brightgreen\?style=flat' | sed -e "s/_PERCENTAGE_/$(TOTAL_COVERAGE)25/g")
 
 # Default target
 .PHONY: help
@@ -77,9 +79,30 @@ test:
 test-verbose:
 	go test -v
 
-code-coverage:
-	go test -cover -coverprofile coverage.out ./...
+
+
+generate-code-coverage:
+	go test -cover -coverprofile coverage.out .
+
+gocovsh:
 	gocovsh
 
 lint:
 	golangci-lint run
+
+fix-imports:
+	goimports -w *.go
+
+coverage: generate-coverage download-coverage-badge show-total-coverage
+
+generate-coverage:
+	@go test -cover -coverprofile coverage.out .
+
+download-coverage-badge:
+	@curl -s -o assets/coverage-badge.svg $(COVERAGE_BADGE_URL)
+
+show-total-coverage:
+	@echo Total-Coverage: $(TOTAL_COVERAGE)
+
+show-coverage-html:
+	go tool cover -html coverage.out
