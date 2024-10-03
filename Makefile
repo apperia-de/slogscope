@@ -62,7 +62,6 @@ patch:
 	@git tag v$(NEW_VERSION)
 	@echo In order to update tags run: git push origin v$(NEW_VERSION)
 
-
 # Go related stuff
 update: update_internal lint test-verbose
 
@@ -78,8 +77,6 @@ test:
 
 test-verbose:
 	go test -v
-
-
 
 generate-code-coverage:
 	go test -cover -coverprofile coverage.out .
@@ -106,3 +103,10 @@ show-total-coverage:
 
 show-coverage-html:
 	go tool cover -html coverage.out
+
+set-package-version:
+	@sed -E 's|(const version = \")(.*)|\1$(VERSION)"|' doc.go > _doc.go
+	@cat _doc.go > doc.go
+	@rm _doc.go
+	@cat doc.go
+

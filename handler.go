@@ -33,7 +33,10 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 	default:
 		// If debug mode is enabled, we use the given log Handler also for internal log messages.
 		if o.Debug {
-			logger = slog.New(h)
+			logger = slog.New(h).WithGroup("slogscope").With(slog.Attr{
+				Key:   "version",
+				Value: slog.StringValue(version),
+			})
 			logger.Debug("debug mode enabled")
 		}
 	}

@@ -6,3 +6,5 @@ packages, making it simpler to manage and debug large applications with varying 
 Please see https://github.com/apperia-de/slogscope for more details.
 */
 package slogscope
+
+const version = "0.2.3"
