@@ -6,7 +6,8 @@ VERSION := $(shell cat $(VERSION_FILE))
 MAJOR := $(word 1,$(subst ., ,$(VERSION)))
 MINOR := $(word 2,$(subst ., ,$(VERSION)))
 PATCH := $(word 3,$(subst ., ,$(VERSION)))
-TOTAL_COVERAGE := $(shell go tool cover -func coverage.out | grep -Eo "total:.*(\d+%)" | grep -Eo "\d+\.\d%")
+#TOTAL_COVERAGE := $(shell go tool cover -func coverage.out | grep -Eo "total:.*(\d+%)" | grep -Eo "\d+\.\d%")
+TOTAL_COVERAGE := $(shell go test -cover | grep -Eo "coverage:\s*\d+\.\d+%" | grep -Eo "\d+\.\d+%")
 COVERAGE_BADGE_URL := $(shell echo 'https://img.shields.io/badge/coverage-_PERCENTAGE_-brightgreen\?style=flat' | sed -e "s/_PERCENTAGE_/$(TOTAL_COVERAGE)25/g")
 
 # Default target
@@ -109,4 +110,3 @@ set-package-version:
 	@cat _doc.go > doc.go
 	@rm _doc.go
 	@cat doc.go
-

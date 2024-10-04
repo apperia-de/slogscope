@@ -32,7 +32,7 @@ go get github.com/apperia-de/slogscope
 
 ### Default values
 
-By default, without any `slogscope.Handleroptions` set, the package will use the default ConfigFile (`./slogscope.yml`).
+By default, without any `slogscope.Handleroptions` set, the package will use the default config file (`./slogscope.yml`).
 ```go 
 // These are the default options if no HandlerOptions are specified.
 defaultFilename := "slogscope.yml"
@@ -72,7 +72,7 @@ func main() {
   slog.SetDefault(logger)
 
   // Use it anywhere else in your code ...  
-  slog.Info("Hello World!")
+  slog.Info("INFO Message")
 }
 
 ```
@@ -94,7 +94,7 @@ func main() {
 	  EnableFileWatcher: true,
   })
   logger := slog.New(handler)
-  logger.Info("Hello World!")
+  logger.Info("INFO Message")
 }
 
 ```
@@ -113,7 +113,7 @@ import (
 )
 
 func main() {
-	// Create a custom Config which will be used instead of the default one provided by ConfigFile.
+	// Create a custom Config which will be used instead of the default one provided by slogscope.HandlerOptions.ConfigFile.
 	cfg := slogscope.Config{
 		LogLevel: "INFO",
 		Packages: []slogscope.Package{
@@ -131,7 +131,7 @@ func main() {
 		ConfigFile:        nil,
 	})
 	logger := slog.New(handler)
-	logger.Info("Hello World!")
+	logger.Info("INFO Message")
 }
 
 ```
@@ -163,4 +163,4 @@ from [@zachmu](https://github.com/zachmu) and my own need for this feature.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
