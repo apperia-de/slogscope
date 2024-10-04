@@ -27,10 +27,10 @@ func main() {
 	}
 
 	<-c
-	slog.Log(nil, 108, "Shutdown example app...")
+	fmt.Println("Shutdown example app...")
 	for _, l := range loggers {
 		l.Stop()
 	}
 	time.Sleep(100 * time.Millisecond)
-	slog.Log(nil, 108, "... done!")
+	fmt.Println("... done!")
 }
