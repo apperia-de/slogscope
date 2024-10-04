@@ -19,51 +19,47 @@ help: ## Outputs this help screen
 
 ## —— Semantic Versioning 🐳 ———————————————————————————————————————————————————————————————————————————————————
 .PHONY: major
-major: ## Increase the major version
+major: _major _set-new-package-version _git_commit_and_tag ## Increase the major version
+
+_major:
 	@echo "Bumping major version..."
 	$(eval NEW_MAJOR := $(shell echo $$(($(MAJOR)+1))))
 	$(eval NEW_VERSION := $(NEW_MAJOR).0.0)
 	@echo $(NEW_VERSION) > $(VERSION_FILE)
 	@echo "Updated version to: $(NEW_VERSION)"
-	@git add .
-	@git commit -m "Release new major version: (v$(NEW_VERSION))"
-	@git tag v$(NEW_VERSION)
-	@echo In order to update tags run: git push origin v$(NEW_VERSION)
 
 .PHONY: minor
-minor: ## Increase the minor version
+minor: _minor _set-new-package-version _git_commit_and_tag ## Increase the minor version
+
+_minor:
 	@echo "Bumping minor version..."
 	$(eval NEW_MINOR := $(shell echo $$(($(MINOR)+1))))
 	$(eval NEW_VERSION := $(MAJOR).$(NEW_MINOR).0)
 	@echo $(NEW_VERSION) > $(VERSION_FILE)
 	@echo "Updated version to: $(NEW_VERSION)"
-	@git add .
-	@git commit -m "Release new minor version: (v$(NEW_VERSION))"
-	@git tag v$(NEW_VERSION)
-	@echo In order to update tags run: git push origin v$(NEW_VERSION)
 
 .PHONY: patch
-patch: ## Increase the patch version
+patch: _patch _set-new-package-version _git_commit_and_tag ## Increase the patch version
+
+_patch:
 	@echo "Bumping patch version..."
 	$(eval NEW_PATCH := $(shell echo $$(($(PATCH)+1))))
 	$(eval NEW_VERSION := $(MAJOR).$(MINOR).$(NEW_PATCH))
 	@echo $(NEW_VERSION) > $(VERSION_FILE)
 	@echo "Updated version to: $(NEW_VERSION)"
+
+_git_commit_and_tag:
 	@git add .
-	@git commit -m "Release new patch version: (v$(NEW_VERSION))"
+	@git commit --amend -C HEAD
 	@git tag v$(NEW_VERSION)
 	@echo In order to update tags run: git push origin v$(NEW_VERSION)
 
-.PHONY: show
-show: ## Show current version
+.PHONY: show-version
+show-version: ## Show current version
 	@echo Current version: $(VERSION)
 
-.PHONY: set-package-version
-set-package-version: ## Sets the current Version within the doc.go file
-	@sed -E 's|(const version = \")(.*)|\1$(VERSION)"|' doc.go > _doc.go
-	@cat _doc.go > doc.go
-	@rm _doc.go
-	@cat doc.go
+_set-new-package-version: # Sets the new version within the doc.go file
+	@sed 's|const version = \".*\"|const version = "$(NEW_VERSION)"|' doc.go | tee doc.go
 
 ## —— Go command 🧙 ————————————————————————————————————————————————————————————————————————————————————————————
 .PHONY: lint

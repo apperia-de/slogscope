@@ -7,4 +7,4 @@ Please see https://github.com/apperia-de/slogscope for more details.
 */
 package slogscope
 
-const version = "0.2.3"
+const version = "0.2.5"
