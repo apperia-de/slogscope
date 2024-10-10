@@ -149,18 +149,47 @@ You can configure `slogscope` to map different log levels to specific packages u
 file method, or passing the current `slogscope.Config` via `Handler.SetConfig(cfg slogscope.Config)`. The default
 behavior is to inherit the global log level if no package-specific level is set.
 
-## Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests to help improve `slogscope`.
-
-### Related Projects
-
-- [awesome-slog](https://github.com/go-slog/awesome-slog): Collection of log/slog related projects.
-
 ## Acknowledgments
 
 This project was inspired by a [blog post](https://www.dolthub.com/blog/2024-09-13-package-scoped-logging-in-go-log4j/)
 from [@zachmu](https://github.com/zachmu) and my own need for this feature.
+
+## Benchmarks
+
+```
+goos: darwin
+goarch: arm64
+cpu: Apple M2 Pro
+
+BenchmarkSlogScopeHandlerLogging       	   771748	          1533 ns/op	     796 B/op	       8 allocs/op
+BenchmarkSlogScopeHandlerLogging-2     	   763969	          1487 ns/op	     799 B/op	       8 allocs/op
+BenchmarkSlogScopeHandlerLogging-4     	   759990	          1509 ns/op	     801 B/op	       8 allocs/op
+BenchmarkSlogScopeHandlerLogging-8     	   785449	          1492 ns/op	     792 B/op	       8 allocs/op
+BenchmarkSlogScopeHandlerLogging-12    	   787588	          1501 ns/op	     791 B/op	       8 allocs/op
+
+BenchmarkDefaultHandlerLogging         	  3042610	         401.9 ns/op	     264 B/op	       0 allocs/op
+BenchmarkDefaultHandlerLogging-2       	  3151632	         381.6 ns/op	     255 B/op	       0 allocs/op
+BenchmarkDefaultHandlerLogging-4       	  3214606	         381.3 ns/op	     250 B/op	       0 allocs/op
+BenchmarkDefaultHandlerLogging-8       	  3215395	         382.0 ns/op	     250 B/op	       0 allocs/op
+BenchmarkDefaultHandlerLogging-12      	  3192922	         381.4 ns/op	     252 B/op	       0 allocs/op
+
+BenchmarkNilHandlerLogging             	379181612	         3.157 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNilHandlerLogging-2           	378851906	         3.160 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNilHandlerLogging-4           	375230414	         3.208 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNilHandlerLogging-8           	373394209	         3.177 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNilHandlerLogging-12          	380379848	         3.176 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	command-line-arguments	22.423s
+```
+
+
+## Related Projects
+
+- [awesome-slog](https://github.com/go-slog/awesome-slog): Collection of log/slog related projects.
+
+## Contributing
+
+Contributions are welcome! Feel free to open issues or submit pull requests to help improve `slogscope`.
 
 ## License
 
