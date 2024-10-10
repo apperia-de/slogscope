@@ -1,10 +1,11 @@
 # slogscope
 
+![GitHub Tag](https://img.shields.io/github/v/tag/apperia-de/slogscope?label=Version)
 ![Go Report Card](https://goreportcard.com/badge/github.com/apperia-de/slogscope)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/apperia-de/slogscope?style=flat)
 ![Coverage](assets/coverage-badge.svg)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Go Reference](https://pkg.go.dev/badge/github.com/apperia-de/slogscope.svg)](https://pkg.go.dev/github.com/apperia-de/slogscope)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 `slogscope` is a custom `slog` Handler for Go, designed to allow fine-grained control over log levels on a per-package
 basis. This package provides an easy way to define different logging levels for individual packages, making it simpler

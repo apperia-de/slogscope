@@ -7,7 +7,7 @@ MAJOR := $(word 1,$(subst ., ,$(VERSION)))
 MINOR := $(word 2,$(subst ., ,$(VERSION)))
 PATCH := $(word 3,$(subst ., ,$(VERSION)))
 TOTAL_COVERAGE := $(shell go test -cover | grep -Eo "coverage:\s*\d+\.\d+%" | grep -Eo "\d+\.\d+%")
-COVERAGE_BADGE_URL := $(shell echo 'https://img.shields.io/badge/coverage-_PERCENTAGE_-brightgreen\?style=flat' | sed -e "s/_PERCENTAGE_/$(TOTAL_COVERAGE)25/g")
+COVERAGE_BADGE_URL := $(shell echo 'https://img.shields.io/badge/Coverage-_PERCENTAGE_-brightgreen\?style=flat' | sed -e "s/_PERCENTAGE_/$(TOTAL_COVERAGE)25/g")
 
 # Misc
 .DEFAULT_GOAL = help
@@ -77,6 +77,10 @@ test: ## Run tests
 .PHONY: test-verbose
 test-verbose: ## Run all tests verbose
 	@go test -v .
+
+.PHONY: benchmark
+benchmark: ## Run benchmark tests
+	@go test -cpu 1,2,4,8,12 -benchmem -bench . benchmark_test.go
 
 .PHONY: update
 update: update-internal lint test ## Update all dependencies and refresh vendor folder

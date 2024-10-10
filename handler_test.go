@@ -273,3 +273,33 @@ func TestHandler_UseConfigFile(t *testing.T) {
 		assert.Equal(t, 2, countLogMessageByLogLevel(buf, slogscope.LogLevelError))
 	})
 }
+
+func TestHandler_GetLogLevel(t *testing.T) {
+	h := setupHandlerWithConfig(oldCfg)
+
+	tests := []struct {
+		level     string
+		slogLevel slog.Level
+	}{
+		{"DEBUG", slog.LevelDebug},
+		{"INFO", slog.LevelInfo},
+		{"WARN", slog.LevelWarn},
+		{"ERROR", slog.LevelError},
+		{"ERROR+1", slog.LevelError + 1},
+		{"ERROR-1", slog.LevelError - 1},
+		{"DEBUG+4", slog.LevelInfo},
+		{"DEBUG+8", slog.LevelWarn},
+		{"DEBUG+12", slog.LevelError},
+		{"DEBUG+100", slog.LevelDebug + 100},
+		{"error-100", slog.LevelError - 100},
+		{"inFo-10", slog.LevelInfo - 10},
+		{"XJDHFIW§R§ü+234'", slog.LevelInfo},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.level, func(t *testing.T) {
+			ll := h.GetLogLevel(tt.level)
+			assert.Equal(t, tt.slogLevel, ll)
+		})
+	}
+}

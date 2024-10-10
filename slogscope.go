@@ -6,9 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -35,7 +33,9 @@ type slogscope struct {
 	h      *Handler
 	slogh  slog.Handler
 	opts   *HandlerOptions
+	logLvl slog.Level // Global log level
 	pkgMap sync.Map
+	//lvlMap sync.Map
 	mu     sync.Mutex
 	doneCh chan struct{}
 	logger *slog.Logger
@@ -143,11 +143,14 @@ func (ss *slogscope) initHandler() {
 
 	ss.logger.Debug("use config:", "config", *ss.opts.Config)
 
+	// Set global log level
+	ss.logLvl = ss.h.GetLogLevel(ss.opts.Config.LogLevel)
+
 	ss.pkgMap.Clear()
 	for _, v := range ss.opts.Config.Packages {
 		p := &pkg{
 			name:     v.Name,
-			logLevel: ss.getLogLevel(v.LogLevel),
+			logLevel: ss.h.GetLogLevel(v.LogLevel),
 		}
 		ss.pkgMap.Store(p.name, p)
 	}
@@ -188,43 +191,6 @@ func (ss *slogscope) loadConfig() *slogscope {
 	ss.opts.Config = &cfg
 	ss.logger.Debug(fmt.Sprintf("config file (%s) loaded.", *ss.opts.ConfigFile))
 	return ss
-}
-
-// getLogLevel converts string log levels to slog.Level representation.
-// Can be one of ["DEBUG", "INFO", "WARN" or "ERROR"].
-// Additionally, it accepts the aforementioned strings +/- an integer for representing additional log levels, not
-// defined by the log/slog package.
-// Example: DEBUG-2 or ERROR+4
-func (ss *slogscope) getLogLevel(level string) slog.Level {
-	levelMap := map[string]slog.Level{
-		LogLevelDebug: slog.LevelDebug,
-		LogLevelInfo:  slog.LevelInfo,
-		LogLevelWarn:  slog.LevelWarn,
-		LogLevelError: slog.LevelError,
-	}
-	level = strings.ToUpper(level)
-	matches := regexp.MustCompile(`([a-zA-Z]+)(([+\-])(\d+))?`).FindStringSubmatch(level)
-
-	slogLevel := levelMap[defaultLogLevel]
-	if len(matches) != 5 {
-		ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
-		return slogLevel
-	}
-
-	slogLevel, ok := levelMap[matches[1]]
-	if !ok {
-		ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
-		return slogLevel
-	}
-
-	if matches[4] != "" {
-		nb, _ := strconv.Atoi(matches[4])
-		if matches[3] == "-" {
-			return slog.Level(int(slogLevel) - nb)
-		}
-		return slog.Level(int(slogLevel) + nb)
-	}
-	return slogLevel
 }
 
 // getCallerInfo returns the *callInfo for a caller.

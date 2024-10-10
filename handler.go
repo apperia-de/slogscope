@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -58,18 +61,17 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 }
 
 func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
-	globalLevel := h.getLogLevel(h.opts.Config.LogLevel)
 	cInfo := getCallerInfo(5)
 	if v, ok := h.pkgMap.Load(cInfo.PackageName); ok {
 		p := v.(*pkg)
-		if lvl >= p.logLevel.Level() {
+		if lvl >= p.logLevel {
 			h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, p.name))
 			return true
 		}
 		return false
 	}
-	h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLevel, cInfo.PackageName))
-	return lvl >= globalLevel
+	h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", h.logLvl, cInfo.PackageName))
+	return lvl >= h.logLvl
 }
 
 func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
@@ -141,6 +143,43 @@ func (h *Handler) UseConfigFile(cfgFile ...string) {
 
 	h.loadConfig().initHandler()
 	h.logger.Debug(fmt.Sprintf("using config file (%s): %#v", *h.opts.ConfigFile, *h.opts.Config))
+}
+
+// GetLogLevel converts string log levels to slog.Level representation.
+// Can be one of ["DEBUG", "INFO", "WARN" or "ERROR"].
+// Additionally, it accepts the aforementioned strings +/- an integer for representing additional log levels, not
+// defined by the log/slog package.
+// Example: DEBUG-2 or ERROR+4
+func (h *Handler) GetLogLevel(level string) slog.Level {
+	levelMap := map[string]slog.Level{
+		LogLevelDebug: slog.LevelDebug,
+		LogLevelInfo:  slog.LevelInfo,
+		LogLevelWarn:  slog.LevelWarn,
+		LogLevelError: slog.LevelError,
+	}
+	level = strings.ToUpper(level)
+	matches := regexp.MustCompile(`([a-zA-Z]+)(([+\-])(\d+))?`).FindStringSubmatch(level)
+
+	slogLevel := levelMap[defaultLogLevel]
+	if len(matches) != 5 {
+		//ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
+		return slogLevel
+	}
+
+	slogLevel, ok := levelMap[matches[1]]
+	if !ok {
+		//ss.logger.Debug(fmt.Sprintf("invalid log level: %q! -> fallback to log level %q", level, defaultLogLevel))
+		return slogLevel
+	}
+
+	if matches[4] != "" {
+		nb, _ := strconv.Atoi(matches[4])
+		if matches[3] == "-" {
+			return slog.Level(int(slogLevel) - nb)
+		}
+		return slog.Level(int(slogLevel) + nb)
+	}
+	return slogLevel
 }
 
 type nilHandler struct{}
