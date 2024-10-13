@@ -22,9 +22,8 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 		o = *opts
 	}
 
-	if o.ConfigFile == nil {
-		filename := defaultConfigFile
-		o.ConfigFile = &filename
+	if o.ConfigFile == "" {
+		o.ConfigFile = defaultConfigFile
 	}
 
 	logger := slog.New(NewNilHandler())
@@ -48,7 +47,7 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 	defer ss.initHandler()
 
 	// We load the HandlerOptions.Config from a config file if no HandlerOptions.Config is provided.
-	if ss.opts.Config == nil && ss.opts.ConfigFile != nil {
+	if ss.opts.Config == nil && ss.opts.ConfigFile != "" {
 		ss.loadConfig()
 	}
 
@@ -135,14 +134,14 @@ func (h *Handler) UseConfigTemporarily(cfg Config, revert time.Duration) {
 func (h *Handler) UseConfigFile(cfgFile ...string) {
 	h.mu.Lock()
 	if len(cfgFile) == 1 && cfgFile[0] != "" {
-		h.opts.ConfigFile = &cfgFile[0]
+		h.opts.ConfigFile = cfgFile[0]
 	}
 
 	h.opts.EnableFileWatcher = true
 	h.mu.Unlock()
 
 	h.loadConfig().initHandler()
-	h.logger.Debug(fmt.Sprintf("using config file (%s): %#v", *h.opts.ConfigFile, *h.opts.Config))
+	h.logger.Debug(fmt.Sprintf("using config file (%s): %#v", h.opts.ConfigFile, *h.opts.Config))
 }
 
 // GetLogLevel converts string log levels to slog.Level representation.

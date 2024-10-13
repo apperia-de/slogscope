@@ -26,7 +26,7 @@ func TestNewHandler(t *testing.T) {
 		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
-			ConfigFile:        &testConfigFile,
+			ConfigFile:        testConfigFile,
 			Config: &slogscope.Config{
 				LogLevel: "DEBUG",
 			},
@@ -44,7 +44,7 @@ func TestNewHandler(t *testing.T) {
 		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
-			ConfigFile:        nil,
+			ConfigFile:        "",
 			Config: &slogscope.Config{
 				LogLevel: "INFO",
 			},
@@ -59,7 +59,7 @@ func TestNewHandler(t *testing.T) {
 		buf.Reset()
 		h := slogscope.NewHandler(slog.NewJSONHandler(&buf, nil), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
-			ConfigFile:        &testConfigFile,
+			ConfigFile:        testConfigFile,
 			Config:            nil,
 			Debug:             false,
 		})
@@ -71,17 +71,16 @@ func TestNewHandler(t *testing.T) {
 	})
 
 	t.Run("test default config file is missing", func(t *testing.T) {
-		var missingConfigFile = "test/data/default_config_is_missing.yml"
-
 		h := slogscope.NewHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}), &slogscope.HandlerOptions{
 			EnableFileWatcher: false,
-			ConfigFile:        &missingConfigFile,
+			ConfigFile:        missingConfigFile,
 		})
 		cfg := h.GetConfig()
 		assert.Equal(t, "INFO", cfg.LogLevel)
-		assert.Equal(t, []slogscope.Package(nil), cfg.Packages)
+		assert.NotNil(t, cfg.Packages)
+		_ = os.Remove(missingConfigFile)
 	})
 
 	t.Run("test with debug mode enabled", func(t *testing.T) {

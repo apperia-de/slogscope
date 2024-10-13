@@ -36,11 +36,10 @@ go get github.com/apperia-de/slogscope
 By default, without any `slogscope.Handleroptions` set, the package will use the default config file (`./slogscope.yml`).
 ```go 
 // These are the default options if no HandlerOptions are specified.
-defaultFilename := "slogscope.yml"
 opts := &slogscope.HandlerOptions{
   EnableFileWatcher: false,
   Config:            nil,
-  ConfigFile:        &defaultFilename,
+  ConfigFile:        "slogscope.yml",
 })
 ```
 
@@ -129,7 +128,7 @@ func main() {
 	handler := slogscope.NewHandler(slog.NewTextHandler(os.Stdout, nil), &slogscope.HandlerOptions{
 		EnableFileWatcher: false,
 		Config:            &cfg,
-		ConfigFile:        nil,
+		ConfigFile:        "",
 	})
 	logger := slog.New(handler)
 	logger.Info("INFO Message")

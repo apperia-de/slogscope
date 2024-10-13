@@ -8,7 +8,7 @@ type Config struct {
 type HandlerOptions struct {
 	Debug             bool
 	Config            *Config
-	ConfigFile        *string
+	ConfigFile        string
 	EnableFileWatcher bool
 }
 

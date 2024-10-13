@@ -19,7 +19,8 @@ var (
 	newCfg = slogscope.Config{
 		LogLevel: slogscope.LogLevelError,
 	}
-	testConfigFile = "test/data/slogscope.test_config.yml"
+	missingConfigFile = "test/data/default_config_is_missing.yml"
+	testConfigFile    = "test/data/slogscope.test_config.yml"
 )
 
 func countLogMessageByLogLevel(buf bytes.Buffer, logLevel string) int {
@@ -37,7 +38,7 @@ func setupHandlerWithConfigFile(cfgFile string) *slogscope.Handler {
 	return slogscope.NewHandler(slog.NewTextHandler(&buf, nil),
 		&slogscope.HandlerOptions{
 			EnableFileWatcher: true,
-			ConfigFile:        &cfgFile,
+			ConfigFile:        cfgFile,
 		},
 	)
 }

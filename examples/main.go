@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	h := slogscope.NewHandler(slog.NewTextHandler(os.Stderr, nil), &slogscope.HandlerOptions{EnableFileWatcher: true})
+	h := slogscope.NewHandler(slog.NewTextHandler(os.Stderr, nil), &slogscope.HandlerOptions{EnableFileWatcher: true, ConfigFile: "testcfg.yml"})
 	l := slog.New(h)
 	slog.SetDefault(l)
 }
