@@ -1,6 +1,8 @@
 package slogscope_test
 
 import (
+	"bytes"
+	"context"
 	"log/slog"
 	"os"
 	"testing"
@@ -301,4 +303,74 @@ func TestHandler_GetLogLevel(t *testing.T) {
 			assert.Equal(t, tt.slogLevel, ll)
 		})
 	}
+}
+
+func TestCoverageImprovements(t *testing.T) {
+	t.Run("invalid log level regex failure", func(t *testing.T) {
+		h := setupHandlerWithConfig(oldCfg)
+		assert.Equal(t, slog.LevelInfo, h.GetLogLevel("123"))
+		assert.Equal(t, slog.LevelInfo, h.GetLogLevel("+5"))
+		assert.Equal(t, slog.LevelInfo, h.GetLogLevel(""))
+	})
+
+	t.Run("nilHandler coverage", func(t *testing.T) {
+		h := slogscope.NewNilHandler()
+		assert.False(t, h.Enabled(context.Background(), slog.LevelError))
+		assert.NoError(t, h.Handle(context.Background(), slog.Record{}))
+		assert.Equal(t, h, h.WithAttrs(nil))
+		assert.Equal(t, h, h.WithGroup(""))
+	})
+
+	t.Run("enabled debug path logging", func(t *testing.T) {
+		var testBuf bytes.Buffer
+		h := slogscope.NewHandler(slog.NewTextHandler(&testBuf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}), &slogscope.HandlerOptions{
+			EnableFileWatcher: false,
+			Debug:             true,
+			Config: &slogscope.Config{
+				LogLevel: "DEBUG",
+				Packages: []slogscope.Package{
+					{
+						Name:     "github.com/apperia-de/slogscope_test",
+						LogLevel: "DEBUG",
+					},
+				},
+			},
+		})
+
+		h.Enabled(context.Background(), slog.LevelDebug)
+	})
+
+	t.Run("invalid config file yaml unmarshal", func(t *testing.T) {
+		badConfigFile := "test/data/bad_config.yml"
+		err := os.WriteFile(badConfigFile, []byte("invalid_yaml: : : :"), 0644)
+		assert.NoError(t, err)
+		defer func() { _ = os.Remove(badConfigFile) }()
+
+		h := slogscope.NewHandler(slogscope.NewNilHandler(), &slogscope.HandlerOptions{
+			ConfigFile: badConfigFile,
+		})
+		assert.Equal(t, "INFO", h.GetConfig().LogLevel)
+	})
+
+	t.Run("stop file watcher via UseConfig", func(t *testing.T) {
+		watchFile := "test/data/watch_stop_config.yml"
+		err := os.WriteFile(watchFile, []byte("log_level: DEBUG"), 0644)
+		assert.NoError(t, err)
+		defer func() { _ = os.Remove(watchFile) }()
+
+		h := slogscope.NewHandler(slogscope.NewNilHandler(), &slogscope.HandlerOptions{
+			EnableFileWatcher: true,
+			ConfigFile:        watchFile,
+		})
+
+		cfg := h.GetConfig()
+		assert.Equal(t, "DEBUG", cfg.LogLevel)
+
+		h.UseConfig(slogscope.Config{
+			LogLevel: "ERROR",
+		})
+		assert.Equal(t, "ERROR", h.GetConfig().LogLevel)
+	})
 }

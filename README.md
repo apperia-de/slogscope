@@ -7,6 +7,14 @@
 
 `slogscope` is a custom `slog` Handler for Go designed to enable package-scoped log level management. It allows developers to define different log levels for individual packages dynamically, making debugging and log volume control in complex applications simple and highly performant.
 
+## Why Package-Scoped Logging?
+
+In production environments, toggling `DEBUG` logging globally can overwhelm log aggregators, inflate ingestion costs, and degrade application performance. `slogscope` solves this by allowing you to target log levels precisely:
+
+- **Targeted Production Debugging**: Enable `DEBUG` logs only for a specific package (e.g., your database connection pool or payment handler) to troubleshoot issues without flooding your logs.
+- **Zero Code Changes**: Works automatically based on your codebase structure. Developers don't need to remember to add specific log attributes or context keys.
+- **Ultra-Low Overhead**: Leverages thread-safe call-site caching (`uintptr` program counters) to eliminate reflection and allocation costs on hot paths, making package checks near-instant.
+
 ## Key Features
 
 - **Per-Package Log Levels**: Set granular log levels (e.g., `DEBUG`, `INFO`, `WARN`, `ERROR`) per package path.
@@ -137,6 +145,14 @@ Here are the benchmark results on `Apple M2 Pro (Go 1.26)`:
 | **slogscope (Before)** | ~1547 ns/op | 798 B/op | 8 allocs/op |
 
 *Note: slogscope performs a caller package path lookup on every check to determine the correct log level. The optimized version reduces this overhead by 37% and cuts memory allocations by 75%.*
+
+## Related Projects
+
+- [awesome-slog](https://github.com/go-slog/awesome-slog): Collection of log/slog related projects.
+
+## Acknowledgments
+
+This project was inspired by a [blog post](https://www.dolthub.com/blog/2024-09-13-package-scoped-logging-in-go-log4j/) from [@zachmu](https://github.com/zachmu) and my own need for this feature.
 
 ## Contributing
 
