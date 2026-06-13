@@ -29,19 +29,19 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 		o.ConfigFile = defaultConfigFile
 	}
 
-	logger := slog.New(NewNilHandler())
+	var logger *slog.Logger
 	switch h.(type) {
 	case nil:
 		panic("slog.Handler must not be nil")
 	case *Handler:
 		panic("slog.Handler must not be of type *Handler")
 	default:
-		// If debug mode is enabled, we use the given log Handler also for internal log messages.
+		ih := &internalHandler{h: h, debug: o.Debug}
+		logger = slog.New(ih).WithGroup("slogscope").With(slog.Attr{
+			Key:   "version",
+			Value: slog.StringValue(version),
+		})
 		if o.Debug {
-			logger = slog.New(h).WithGroup("slogscope").With(slog.Attr{
-				Key:   "version",
-				Value: slog.StringValue(version),
-			})
 			logger.Debug("debug mode enabled")
 		}
 	}
@@ -71,7 +71,7 @@ func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
 	var resolved bool
 	for i := 0; i < n; i++ {
 		siteInfo := h.resolveCallSite(pcs[i])
-		if siteInfo.pkgName != "log/slog" && siteInfo.pkgName != "github.com/apperia-de/slogscope" && siteInfo.pkgName != "runtime" {
+		if siteInfo.pkgName != "log/slog" && siteInfo.pkgName != "runtime" {
 			info = siteInfo
 			resolved = true
 			break
@@ -226,4 +226,28 @@ func (h *nilHandler) WithAttrs([]slog.Attr) slog.Handler {
 
 func (h *nilHandler) WithGroup(_ string) slog.Handler {
 	return h
+}
+
+type internalHandler struct {
+	h     slog.Handler
+	debug bool
+}
+
+func (ih *internalHandler) Enabled(_ context.Context, level slog.Level) bool {
+	if ih.debug {
+		return true
+	}
+	return level >= slog.LevelError
+}
+
+func (ih *internalHandler) Handle(ctx context.Context, record slog.Record) error {
+	return ih.h.Handle(ctx, record)
+}
+
+func (ih *internalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &internalHandler{h: ih.h.WithAttrs(attrs), debug: ih.debug}
+}
+
+func (ih *internalHandler) WithGroup(name string) slog.Handler {
+	return &internalHandler{h: ih.h.WithGroup(name), debug: ih.debug}
 }

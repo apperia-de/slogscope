@@ -1,6 +1,7 @@
 package slogscope
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
@@ -83,4 +84,43 @@ func TestWildcardNormalization(t *testing.T) {
 	assert.Equal(t, slog.LevelDebug, h.pkgMap["pkg/a"])
 	assert.Equal(t, slog.LevelWarn, h.pkgMap["pkg/b"])
 	assert.Equal(t, slog.LevelError, h.pkgMap["pkg/c"])
+}
+
+func TestInternalHandler(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("debug false", func(t *testing.T) {
+		nilH := NewNilHandler()
+		ih := &internalHandler{h: nilH, debug: false}
+
+		// Errors and higher should be enabled
+		assert.True(t, ih.Enabled(ctx, slog.LevelError))
+		assert.True(t, ih.Enabled(ctx, slog.LevelError+4))
+
+		// Info/Warn/Debug should not be enabled
+		assert.False(t, ih.Enabled(ctx, slog.LevelWarn))
+		assert.False(t, ih.Enabled(ctx, slog.LevelInfo))
+		assert.False(t, ih.Enabled(ctx, slog.LevelDebug))
+	})
+
+	t.Run("debug true", func(t *testing.T) {
+		nilH := NewNilHandler()
+		ih := &internalHandler{h: nilH, debug: true}
+
+		// Errors, Warnings, Info, Debug, and custom debug levels should be enabled
+		assert.True(t, ih.Enabled(ctx, slog.LevelError))
+		assert.True(t, ih.Enabled(ctx, slog.LevelWarn))
+		assert.True(t, ih.Enabled(ctx, slog.LevelInfo))
+		assert.True(t, ih.Enabled(ctx, slog.LevelDebug))
+		assert.True(t, ih.Enabled(ctx, slog.LevelDebug-1))
+	})
+
+	t.Run("methods delegation", func(t *testing.T) {
+		nilH := NewNilHandler()
+		ih := &internalHandler{h: nilH, debug: true}
+
+		assert.NotNil(t, ih.WithAttrs(nil))
+		assert.NotNil(t, ih.WithGroup("test"))
+		assert.Nil(t, ih.Handle(ctx, slog.Record{}))
+	})
 }
