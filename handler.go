@@ -63,12 +63,22 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 }
 
 func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
-	pc, _, _, ok := runtime.Caller(5)
-	if !ok {
+	var pcs [12]uintptr
+	// Skip 2: skip runtime.Callers and Handler.Enabled
+	n := runtime.Callers(2, pcs[:])
+
+	var pkgName string
+	for i := 0; i < n; i++ {
+		name := h.getPackageName(pcs[i])
+		if name != "log/slog" && name != "github.com/apperia-de/slogscope" && name != "runtime" {
+			pkgName = name
+			break
+		}
+	}
+	if pkgName == "" {
 		return lvl >= slog.Level(h.logLvl.Load())
 	}
 
-	pkgName := h.getPackageName(pc)
 	h.pkgMapMu.RLock()
 	lvlOverride, ok := h.pkgMap[pkgName]
 	h.pkgMapMu.RUnlock()

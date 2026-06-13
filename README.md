@@ -140,11 +140,11 @@ Here are the benchmark results on `Apple M2 Pro (Go 1.26)`:
 
 | Logger Handler | Performance (ns/op) | Allocations (B/op) | Allocations (op) |
 | :--- | :--- | :--- | :--- |
-| **Default Handler** | ~373 ns/op | 244 B/op | 0 allocs/op |
-| **slogscope (Optimized)** | **~964 ns/op** | **581 B/op** | **2 allocs/op** |
+| **Default Handler** | ~394 ns/op | 246 B/op | 0 allocs/op |
+| **slogscope (Optimized)** | **~996 ns/op** | **175 B/op** | **0 allocs/op** |
 | **slogscope (Before)** | ~1547 ns/op | 798 B/op | 8 allocs/op |
 
-*Note: slogscope performs a caller package path lookup on every check to determine the correct log level. The optimized version reduces this overhead by 37% and cuts memory allocations by 75%.*
+*Note: slogscope performs a caller package path lookup on every check to determine the correct log level. The optimized version reduces this overhead by 35% and completely eliminates memory allocations (0 allocs/op).*
 
 ## Related Projects
 
