@@ -2,9 +2,10 @@ package slogscope_test
 
 import (
 	"bytes"
-	"github.com/apperia-de/slogscope"
 	"log/slog"
 	"testing"
+
+	"github.com/apperia-de/slogscope"
 )
 
 func BenchmarkSlogScopeHandlerLogging(b *testing.B) {

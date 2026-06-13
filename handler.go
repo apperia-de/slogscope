@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var logLevelRegex = regexp.MustCompile(`([a-zA-Z]+)(([+\-])(\d+))?`)
 
 type Handler struct {
 	*slogscope
@@ -60,17 +63,30 @@ func NewHandler(h slog.Handler, opts *HandlerOptions) *Handler {
 }
 
 func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
-	cInfo := getCallerInfo(5)
-	if v, ok := h.pkgMap.Load(cInfo.PackageName); ok {
-		p := v.(*pkg)
-		if lvl >= p.logLevel {
-			h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, p.name))
+	pc, _, _, ok := runtime.Caller(5)
+	if !ok {
+		return lvl >= slog.Level(h.logLvl.Load())
+	}
+
+	pkgName := h.getPackageName(pc)
+	h.pkgMapMu.RLock()
+	lvlOverride, ok := h.pkgMap[pkgName]
+	h.pkgMapMu.RUnlock()
+
+	if ok {
+		if lvl >= lvlOverride {
+			if h.debug.Load() {
+				h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, pkgName))
+			}
 			return true
 		}
 		return false
 	}
-	h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", h.logLvl, cInfo.PackageName))
-	return lvl >= h.logLvl
+	globalLvl := slog.Level(h.logLvl.Load())
+	if h.debug.Load() {
+		h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLvl, pkgName))
+	}
+	return lvl >= globalLvl
 }
 
 func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
@@ -157,7 +173,7 @@ func (h *Handler) GetLogLevel(level string) slog.Level {
 		LogLevelError: slog.LevelError,
 	}
 	level = strings.ToUpper(level)
-	matches := regexp.MustCompile(`([a-zA-Z]+)(([+\-])(\d+))?`).FindStringSubmatch(level)
+	matches := logLevelRegex.FindStringSubmatch(level)
 
 	slogLevel := levelMap[defaultLogLevel]
 	if len(matches) != 5 {

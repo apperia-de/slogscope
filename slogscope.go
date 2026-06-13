@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
@@ -32,31 +32,19 @@ const (
 
 // slogscope contains all required Handler configurations.
 type slogscope struct {
-	h      *Handler
-	slogh  slog.Handler
-	opts   *HandlerOptions
-	logLvl slog.Level // Global log level
-	pkgMap sync.Map
+	h         *Handler
+	slogh     slog.Handler
+	opts      *HandlerOptions
+	logLvl    atomic.Int32 // Global log level (slog.Level)
+	debug     atomic.Bool  // Debug mode flag
+	pkgMapMu  sync.RWMutex
+	pkgMap    map[string]slog.Level // Map from package name to its log level
+	pcCacheMu sync.RWMutex
+	pcCache   map[uintptr]string // Cache for PC to package name mapping
 	//lvlMap sync.Map
 	mu     sync.Mutex
 	doneCh chan struct{}
 	logger *slog.Logger
-}
-
-// pkg contains information about the package name and corresponding log level.
-type pkg struct {
-	name     string
-	logLevel slog.Level
-}
-
-// callInfo represents the result of the call to getCallerInfo(skip int).
-type callInfo struct {
-	FuncName    string `json:"funcName,omitempty"`
-	PackageName string `json:"packageName"`
-	Filename    string `json:"filename"`
-	FilePath    string `json:"filePath"`
-	LineNo      int    `json:"lineNo"`
-	Source      string `json:"source"`
 }
 
 // initConfigFileWatcher watches the specified config file for changes and reflects them instantly in their
@@ -160,17 +148,16 @@ func (ss *slogscope) initHandler() {
 
 	ss.logger.Debug("use config:", "config", *ss.opts.Config)
 
-	// Set global log level
-	ss.logLvl = ss.h.GetLogLevel(ss.opts.Config.LogLevel)
+	// Set global log level and debug flag
+	ss.logLvl.Store(int32(ss.h.GetLogLevel(ss.opts.Config.LogLevel)))
+	ss.debug.Store(ss.opts.Debug)
 
-	ss.pkgMap.Clear()
+	ss.pkgMapMu.Lock()
+	ss.pkgMap = make(map[string]slog.Level)
 	for _, v := range ss.opts.Config.Packages {
-		p := &pkg{
-			name:     v.Name,
-			logLevel: ss.h.GetLogLevel(v.LogLevel),
-		}
-		ss.pkgMap.Store(p.name, p)
+		ss.pkgMap[v.Name] = ss.h.GetLogLevel(v.LogLevel)
 	}
+	ss.pkgMapMu.Unlock()
 
 	if ss.doneCh != nil {
 		close(ss.doneCh)
@@ -210,38 +197,33 @@ func (ss *slogscope) loadConfig() *slogscope {
 	return ss
 }
 
-// getCallerInfo returns the *callInfo for a caller.
-// It includes the function name, package name, filename, filepath and line number.
-// For convenience, there is also a Source attribute, containing the full filename and line number.
-// As in runtime.Caller, the argument skip is the number of stack frames to ascend,
-// with 0 identifying the caller of Caller.
-func getCallerInfo(skip int) *callInfo {
-	pc, file, lineNo, ok := runtime.Caller(skip)
-	if !ok {
-		return &callInfo{}
+// getPackageName returns the package name for a given program counter.
+// It caches results in pcCache to avoid expensive runtime inspections.
+func (ss *slogscope) getPackageName(pc uintptr) string {
+	ss.pcCacheMu.RLock()
+	if ss.pcCache != nil {
+		if name, ok := ss.pcCache[pc]; ok {
+			ss.pcCacheMu.RUnlock()
+			return name
+		}
 	}
+	ss.pcCacheMu.RUnlock()
 
 	funcName := runtime.FuncForPC(pc).Name()
-	filename := path.Base(file) // The Base function returns the last element of the path
-	filePath := path.Dir(file)
-
 	lastSlash := strings.LastIndexByte(funcName, '/')
 	if lastSlash < 0 {
 		lastSlash = 0
 	}
 	firstDot := strings.IndexByte(funcName[lastSlash:], '.') + lastSlash
+	pkgName := funcName[:firstDot]
 
-	ci := &callInfo{
-		FuncName:    funcName[firstDot+1:],
-		PackageName: funcName[:firstDot],
-		Filename:    filename,
-		FilePath:    filePath,
-		LineNo:      lineNo,
+	ss.pcCacheMu.Lock()
+	if ss.pcCache == nil {
+		ss.pcCache = make(map[uintptr]string)
 	}
-
-	ci.Source = fmt.Sprintf("%s/%s:%d", ci.FilePath, ci.Filename, ci.LineNo)
-
-	return ci
+	ss.pcCache[pc] = pkgName
+	ss.pcCacheMu.Unlock()
+	return pkgName
 }
 
 // checkFileExists returns true if a file exists at that location on disk.
