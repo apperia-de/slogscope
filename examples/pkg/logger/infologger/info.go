@@ -1,10 +1,12 @@
 package infologger
 
 import (
+	"context"
 	"fmt"
-	"github.com/apperia-de/slogscope/examples/pkg/logger"
 	"log/slog"
 	"time"
+
+	"github.com/apperia-de/slogscope/examples/pkg/logger"
 )
 
 const (
@@ -29,9 +31,9 @@ func (l *Logger) Start() {
 			select {
 			case t := <-time.Tick(l.LogInterval):
 				idx := t.UnixNano() % int64(len(l.Messages))
-				slog.Log(nil, l.LogLevel, l.Messages[idx], slog.Time("date", t))
+				slog.Log(context.TODO(), l.LogLevel, l.Messages[idx], slog.Time("date", t))
 			case <-l.Done:
-				slog.Log(nil, 108, fmt.Sprintf("shutting down package: %q", l.PackageName))
+				slog.Log(context.TODO(), 108, fmt.Sprintf("shutting down package: %q", l.PackageName))
 				return
 			}
 		}

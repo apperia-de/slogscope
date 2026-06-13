@@ -78,6 +78,13 @@ test: ## Run tests
 test-verbose: ## Run all tests verbose
 	@go test -v .
 
+.PHONY: vuln
+vuln: ## Run vulncheck
+	@govulncheck ./...
+
+.PHONY: verify 
+verify: test lint vuln ## Run test, lint, and vulncheck
+
 .PHONY: benchmark
 benchmark: ## Run benchmark tests
 	@go test -cpu 1,2,4,8,12 -benchmem -bench . benchmark_test.go
