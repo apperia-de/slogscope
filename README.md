@@ -43,6 +43,29 @@ packages:
     log_level: ERROR
 ```
 
+### Wildcards & Package Inheritance
+
+`slogscope` supports hierarchical package log level inheritance. If you configure a log level override for a parent package, all of its subpackages will automatically inherit that log level unless they define their own more specific override.
+
+To make this intuitive, suffix wildcards (`/*` and `/...`) at the end of package paths are fully supported and behave identically (both are normalized by stripping the suffix):
+
+```yaml
+packages:
+  # This package and all subpackages recursively (e.g. debuglogger, errorlogger) inherit ERROR level
+  - name: github.com/apperia-de/slogscope/examples/pkg/logger/*
+    log_level: ERROR
+
+  # This is equivalent to using '/*'
+  - name: github.com/apperia-de/slogscope/examples/pkg/logger/...
+    log_level: ERROR
+
+  # Or simply omit the wildcard entirely (slogscope still matches subpackages recursively)
+  - name: github.com/apperia-de/slogscope/examples/pkg/logger
+    log_level: ERROR
+```
+
+Please note that middle-of-path wildcards (e.g. `github.com/.../logger/*`) are not supported.
+
 ## Quick Start
 
 ### Basic Usage

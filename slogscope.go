@@ -30,6 +30,13 @@ const (
 	LogLevelError = "ERROR"
 )
 
+// callSiteInfo represents the resolved log override settings for a call site.
+type callSiteInfo struct {
+	pkgName     string
+	overrideLvl slog.Level
+	hasOverride bool
+}
+
 // slogscope contains all required Handler configurations.
 type slogscope struct {
 	h         *Handler
@@ -40,7 +47,7 @@ type slogscope struct {
 	pkgMapMu  sync.RWMutex
 	pkgMap    map[string]slog.Level // Map from package name to its log level
 	pcCacheMu sync.RWMutex
-	pcCache   map[uintptr]string // Cache for PC to package name mapping
+	pcCache   map[uintptr]callSiteInfo // Cache for PC to call site mapping
 	//lvlMap sync.Map
 	mu     sync.Mutex
 	doneCh chan struct{}
@@ -155,9 +162,17 @@ func (ss *slogscope) initHandler() {
 	ss.pkgMapMu.Lock()
 	ss.pkgMap = make(map[string]slog.Level)
 	for _, v := range ss.opts.Config.Packages {
-		ss.pkgMap[v.Name] = ss.h.GetLogLevel(v.LogLevel)
+		name := v.Name
+		name = strings.TrimSuffix(name, "/...")
+		name = strings.TrimSuffix(name, "/*")
+		ss.pkgMap[name] = ss.h.GetLogLevel(v.LogLevel)
 	}
 	ss.pkgMapMu.Unlock()
+
+	// Clear the call-site cache on configuration updates to apply new overrides
+	ss.pcCacheMu.Lock()
+	ss.pcCache = make(map[uintptr]callSiteInfo)
+	ss.pcCacheMu.Unlock()
 
 	if ss.doneCh != nil {
 		close(ss.doneCh)
@@ -197,18 +212,19 @@ func (ss *slogscope) loadConfig() *slogscope {
 	return ss
 }
 
-// getPackageName returns the package name for a given program counter.
-// It caches results in pcCache to avoid expensive runtime inspections.
-func (ss *slogscope) getPackageName(pc uintptr) string {
+// resolveCallSite resolves the package name and finds the best hierarchical log level override
+// for a given program counter, caching the result to keep subsequent checks near-instant.
+func (ss *slogscope) resolveCallSite(pc uintptr) callSiteInfo {
 	ss.pcCacheMu.RLock()
 	if ss.pcCache != nil {
-		if name, ok := ss.pcCache[pc]; ok {
+		if info, ok := ss.pcCache[pc]; ok {
 			ss.pcCacheMu.RUnlock()
-			return name
+			return info
 		}
 	}
 	ss.pcCacheMu.RUnlock()
 
+	// 1. Resolve package name
 	funcName := runtime.FuncForPC(pc).Name()
 	lastSlash := strings.LastIndexByte(funcName, '/')
 	if lastSlash < 0 {
@@ -217,13 +233,38 @@ func (ss *slogscope) getPackageName(pc uintptr) string {
 	firstDot := strings.IndexByte(funcName[lastSlash:], '.') + lastSlash
 	pkgName := funcName[:firstDot]
 
+	// 2. Perform prefix walking to find nearest hierarchical override
+	ss.pkgMapMu.RLock()
+	curr := pkgName
+	var overrideLvl slog.Level
+	var hasOverride bool
+	for {
+		if lvl, ok := ss.pkgMap[curr]; ok {
+			overrideLvl = lvl
+			hasOverride = true
+			break
+		}
+		idx := strings.LastIndexByte(curr, '/')
+		if idx < 0 {
+			break
+		}
+		curr = curr[:idx]
+	}
+	ss.pkgMapMu.RUnlock()
+
+	info := callSiteInfo{
+		pkgName:     pkgName,
+		overrideLvl: overrideLvl,
+		hasOverride: hasOverride,
+	}
+
 	ss.pcCacheMu.Lock()
 	if ss.pcCache == nil {
-		ss.pcCache = make(map[uintptr]string)
+		ss.pcCache = make(map[uintptr]callSiteInfo)
 	}
-	ss.pcCache[pc] = pkgName
+	ss.pcCache[pc] = info
 	ss.pcCacheMu.Unlock()
-	return pkgName
+	return info
 }
 
 // checkFileExists returns true if a file exists at that location on disk.

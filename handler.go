@@ -67,26 +67,24 @@ func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
 	// Skip 2: skip runtime.Callers and Handler.Enabled
 	n := runtime.Callers(2, pcs[:])
 
-	var pkgName string
+	var info callSiteInfo
+	var resolved bool
 	for i := 0; i < n; i++ {
-		name := h.getPackageName(pcs[i])
-		if name != "log/slog" && name != "github.com/apperia-de/slogscope" && name != "runtime" {
-			pkgName = name
+		siteInfo := h.resolveCallSite(pcs[i])
+		if siteInfo.pkgName != "log/slog" && siteInfo.pkgName != "github.com/apperia-de/slogscope" && siteInfo.pkgName != "runtime" {
+			info = siteInfo
+			resolved = true
 			break
 		}
 	}
-	if pkgName == "" {
+	if !resolved {
 		return lvl >= slog.Level(h.logLvl.Load())
 	}
 
-	h.pkgMapMu.RLock()
-	lvlOverride, ok := h.pkgMap[pkgName]
-	h.pkgMapMu.RUnlock()
-
-	if ok {
-		if lvl >= lvlOverride {
+	if info.hasOverride {
+		if lvl >= info.overrideLvl {
 			if h.debug.Load() {
-				h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, pkgName))
+				h.logger.Debug(fmt.Sprintf("use package log level=%q for package=%q", lvl, info.pkgName))
 			}
 			return true
 		}
@@ -94,7 +92,7 @@ func (h *Handler) Enabled(_ context.Context, lvl slog.Level) bool {
 	}
 	globalLvl := slog.Level(h.logLvl.Load())
 	if h.debug.Load() {
-		h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLvl, pkgName))
+		h.logger.Debug(fmt.Sprintf("use global log level=%q for package=%q", globalLvl, info.pkgName))
 	}
 	return lvl >= globalLvl
 }
